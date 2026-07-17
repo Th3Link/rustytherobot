@@ -16,6 +16,7 @@ pub enum Command {
     Move(MoveCommand),
     Info(InfoCommand),
     Rename(RenameCommand),
+    Delete(DeleteCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -28,6 +29,10 @@ pub struct RenameCommand {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "info", description = "info about robot position")]
 pub struct InfoCommand {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "delete", description = "delete the robot")]
+pub struct DeleteCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "move", description = "move the robot")]

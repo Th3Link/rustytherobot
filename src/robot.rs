@@ -1,6 +1,8 @@
 use crate::direction::Direction;
 use crate::position::Position;
-use tracing::info;
+use directories::ProjectDirs;
+use serde::{Deserialize, Serialize};
+use tracing::{error, info, warn};
 
 pub trait Movable {
     fn move_robot(&mut self, direction: Direction) -> Result<(), MovementError>;
@@ -11,6 +13,7 @@ pub enum MovementError {
     TooFar,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Robot {
     name: String,
     position: Position,
@@ -32,7 +35,26 @@ impl Robot {
             from = self.name,
             to = new_name
         );
+        self.remove_file();
         self.name = String::from(new_name);
+        self.store();
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn remove_file(&self) {
+        ProjectDirs::from("de", "marc", "rustytherobot")
+            .map(|project_dirs| {
+                project_dirs
+                    .config_dir()
+                    .join(format!("{robot_name}.json", robot_name = self.name))
+            })
+            .map(|path| {
+                std::fs::remove_file(&path)
+                    .inspect_err(|err| error!("cannot remove file {path:?}: {err}"))
+                    .ok()
+            });
     }
 
     pub fn would_collide(&self, direction: Direction, other_robot: &Robot) -> bool {
@@ -52,6 +74,37 @@ impl Robot {
 
     pub fn charge(&mut self, power: i32) {
         self.battery_level += power;
+    }
+
+    pub fn load(robot_name: String) -> Option<Self> {
+        ProjectDirs::from("de", "marc", "rustytherobot")
+            .map(|project_dirs| project_dirs.config_dir().join(format!("{robot_name}.json")))
+            .and_then(|file| {
+                std::fs::read_to_string(&file)
+                    .inspect_err(|err| warn!("could not read file {file:?}: {err}"))
+                    .ok()
+            })
+            .and_then(|data| {
+                serde_json::from_str::<Robot>(&data)
+                    .inspect_err(|err| warn!("could not deserialize: {err}"))
+                    .ok()
+            })
+    }
+
+    pub fn store(&self) {
+        let config_dir = ProjectDirs::from("de", "marc", "rustytherobot")
+            .map(|project_dirs| project_dirs.config_dir().to_path_buf());
+
+        if let Some(config_dir) = config_dir.as_ref() {
+            let data = serde_json::to_string_pretty(self).unwrap();
+            std::fs::create_dir_all(config_dir)
+                .inspect_err(|err| error!("could not create dir {config_dir:?}: {err}"))
+                .ok();
+            let path = config_dir.join(format!("{robot_name}.json", robot_name = self.name));
+            std::fs::write(&path, data)
+                .inspect_err(|err| error!("cannot write file {path:?}: {err}"))
+                .ok();
+        }
     }
 }
 impl Movable for Robot {
