@@ -1,3 +1,4 @@
+use clap::Parser;
 use rustytherobot::cli::Cli;
 use rustytherobot::run::run;
 use tracing::{Level, info};
@@ -14,7 +15,7 @@ fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let cli: Cli = argh::from_env();
+    let cli = Cli::parse();
     info!("main started");
     run(cli);
 }

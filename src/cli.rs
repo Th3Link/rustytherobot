@@ -1,70 +1,54 @@
-use argh::FromArgs;
+use clap::{Args, Parser, Subcommand};
 
-#[derive(FromArgs, Debug)]
-#[argh(description = "rusty the robot")]
+#[derive(Parser, Debug)]
+#[command(name = "robot")]
+#[command(about = "rusty the robot")]
 pub struct Cli {
-    #[argh(positional, description = "name of the robot")]
+    /// name of the robot
     pub robot_name: String,
 
-    #[argh(subcommand)]
+    #[command(subcommand)]
     pub command: Command,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Command {
+    /// move the robot
     Move(MoveCommand),
-    Info(InfoCommand),
+
+    /// info about robot position
+    Info,
+
+    /// rename the robot
     Rename(RenameCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "rename", description = "rename the robot")]
+#[derive(Args, Debug)]
 pub struct RenameCommand {
-    #[argh(positional)]
+    /// new name
     pub new_name: String,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "info", description = "info about robot position")]
-pub struct InfoCommand {}
-
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "move", description = "move the robot")]
+#[derive(Args, Debug)]
 pub struct MoveCommand {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     pub direction: MoveDirection,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum MoveDirection {
-    Up(Up),
-    Down(Down),
-    Left(Left),
-    Right(Right),
+    /// Move up
+    Up {
+        /// number of steps
+        steps: i32,
+    },
+
+    /// Move down
+    Down,
+
+    /// Move left
+    Left,
+
+    /// Move right
+    Right,
 }
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Move up.
-#[argh(subcommand, name = "up")]
-pub struct Up {
-    /// number of steps
-    #[argh(positional)]
-    pub steps: i32,
-}
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Move down.
-#[argh(subcommand, name = "down")]
-pub struct Down {}
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Move left.
-#[argh(subcommand, name = "left")]
-pub struct Left {}
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Move right.
-#[argh(subcommand, name = "right")]
-pub struct Right {}
