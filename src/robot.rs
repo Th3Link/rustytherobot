@@ -1,5 +1,6 @@
 use crate::direction::Direction;
 use crate::position::Position;
+use tracing::info;
 
 pub trait Movable {
     fn move_robot(&mut self, direction: Direction) -> Result<(), MovementError>;
@@ -11,18 +12,27 @@ pub enum MovementError {
 }
 
 pub struct Robot {
-    robot_id: u32,
+    name: String,
     position: Position,
     battery_level: i32,
 }
 
 impl Robot {
-    pub fn new(robot_id: u32) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
-            robot_id,
+            name,
             position: Position::new(0, 0),
             battery_level: 100,
         }
+    }
+
+    pub fn rename(&mut self, new_name: &str) {
+        info!(
+            "robot name changeg from {from} to {to}",
+            from = self.name,
+            to = new_name
+        );
+        self.name = String::from(new_name);
     }
 
     pub fn would_collide(&self, direction: Direction, other_robot: &Robot) -> bool {
@@ -76,7 +86,7 @@ impl std::fmt::Display for Robot {
         write!(
             f,
             "My id is {}. I am on position {}. My battery level is at {}",
-            self.robot_id, self.position, self.battery_level
+            self.name, self.position, self.battery_level
         )
     }
 }
@@ -86,7 +96,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_move_robot() {
-        let mut robot = Robot::new(1);
+        let mut robot = Robot::new(String::from("one"));
         assert!(robot.move_robot(Direction::Down).is_ok());
         assert_eq!(robot.position.y, -1);
 

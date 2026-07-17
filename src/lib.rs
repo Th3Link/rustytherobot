@@ -1,3 +1,4 @@
+pub mod cli;
 mod direction;
 mod position;
 mod robot;

@@ -1,34 +1,46 @@
+use crate::cli::{Cli, Command, MoveCommand, MoveDirection, RenameCommand, Up};
 use crate::direction::Direction;
 use crate::robot::Movable;
 use crate::robot::Robot;
-use crate::world::wall::Wall;
+use tracing::{info, warn};
 
-pub fn run() {
-    let mut robot = Robot::new(1);
-    println!("{robot}");
-
-    let _ = robot
-        .move_robot(Direction::Up(5))
-        .inspect_err(|err| println!("Could not move robot: {err:?}"));
-    let _ = robot.move_robot(Direction::Right);
-    if robot.move_robot(Direction::Up(2)).is_ok() {
-        println!("Movement was possible");
+pub fn run(cli: Cli) {
+    info!("run with cli {cli:?}", cli = cli);
+    let mut robot = Robot::new(cli.robot_name);
+    info!("{robot}");
+    match cli.command {
+        Command::Info(_) => {
+            println!("Robot position: {robot}")
+        }
+        Command::Rename(RenameCommand { new_name }) => {
+            robot.rename(&new_name);
+        }
+        Command::Move(MoveCommand { direction }) => match direction {
+            MoveDirection::Up(Up { steps }) => {
+                robot
+                    .move_robot(Direction::Up(steps))
+                    .inspect_err(|err| warn!("Could not move robot: {err:?}"))
+                    .ok();
+            }
+            MoveDirection::Down(_) => {
+                robot
+                    .move_robot(Direction::Down)
+                    .inspect_err(|err| warn!("Could not move robot: {err:?}"))
+                    .ok();
+            }
+            MoveDirection::Left(_) => {
+                robot
+                    .move_robot(Direction::Left)
+                    .inspect_err(|err| warn!("Could not move robot: {err:?}"))
+                    .ok();
+            }
+            MoveDirection::Right(_) => {
+                robot
+                    .move_robot(Direction::Right)
+                    .inspect_err(|err| warn!("Could not move robot: {err:?}"))
+                    .ok();
+            }
+        },
     }
-    robot.move_robot(Direction::Right).unwrap();
-    println!("{robot}");
-    robot.charge(112);
-    println!("{robot}");
-    robot.move_robot(Direction::Down).unwrap();
-    robot.move_robot(Direction::Left).unwrap();
-    println!("{robot}");
-
-    let mut robot2 = Robot::new(2);
-    robot2.move_robot(Direction::Up(2)).unwrap();
-    robot2.move_robot(Direction::Right).unwrap();
-    robot2.move_robot(Direction::Right).unwrap();
-    let wc = robot2.would_collide(Direction::Left, &robot);
-    if !wc {
-        let _ = robot2.move_robot(Direction::Left);
-    }
-    println!("{robot}");
+    println!("New robot position: {robot}");
 }
