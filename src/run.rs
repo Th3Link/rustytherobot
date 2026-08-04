@@ -1,10 +1,13 @@
 use crate::cli::{Cli, Command, MoveCommand, MoveDirection, RenameCommand, Up};
+use crate::config::Config;
 use crate::direction::Direction;
 use crate::robot::Movable;
 use crate::robot::Robot;
 use tracing::{error, info, warn};
 pub fn run(cli: Cli) {
     info!("run with cli {cli:?}", cli = cli);
+
+    let _config = Config::load().unwrap_or_default();
 
     // load state
     let robot_name = cli.robot_name;
@@ -26,6 +29,13 @@ pub fn run(cli: Cli) {
                 || error!("robot {robot_name} does not exist"),
                 |robot| robot.remove_file(),
             );
+        }
+        Command::Create(_) => {
+            if robot.is_some() {
+                warn!("Could not create robot: already exist");
+            } else {
+                Robot::new(robot_name).store();
+            }
         }
         Command::Move(MoveCommand { direction }) => {
             let mut robot = robot.unwrap_or(Robot::new(robot_name));

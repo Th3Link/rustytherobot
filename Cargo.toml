@@ -10,3 +10,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 directories = { version = "6" }
 serde = { version = "1" }
 serde_json = { version = "1" }
+ron = { version = "0.12" }
