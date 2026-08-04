@@ -1,4 +1,5 @@
 use crate::dimension::Dimension;
+use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -26,19 +27,18 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, ()> {
-        ProjectDirs::from("de", "marc", "rustytherobot")
-            .map(|project_dirs| project_dirs.config_dir().join(CONFIG_FILENAME))
-            .ok_or(())
-            .and_then(|file| {
-                std::fs::read_to_string(&file)
-                    .inspect_err(|err| warn!("could not read file {file:?}: {err}"))
-                    .map_err(|_err| ())
-            })
-            .and_then(|data| {
-                ron::from_str::<Config>(&data)
-                    .inspect_err(|err| warn!("could not deserialize: {err}"))
-                    .map_err(|_err| ())
-            })
+    pub fn load() -> Result<Self> {
+        let file = ProjectDirs::from("de", "marc", "rustytherobot")
+            .context("Could not determine configuration directory")?
+            .config_dir()
+            .join(CONFIG_FILENAME);
+
+        let data = std::fs::read_to_string(&file)
+            .with_context(|| format!("Could not read configuration file {file:?}"))?;
+
+        let config =
+            ron::from_str::<Config>(&data).context("Failed to deserialize configuration")?;
+
+        Ok(config)
     }
 }

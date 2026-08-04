@@ -1,8 +1,9 @@
 use crate::direction::Direction;
 use crate::position::Position;
+use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 pub trait Movable {
     fn move_robot(&mut self, direction: Direction) -> Result<(), MovementError>;
@@ -29,7 +30,7 @@ impl Robot {
         }
     }
 
-    pub fn rename(&mut self, new_name: &str) {
+    pub fn rename(&mut self, new_name: &str) -> Result<()> {
         info!(
             "robot name changeg from {from} to {to}",
             from = self.name,
@@ -37,7 +38,7 @@ impl Robot {
         );
         self.remove_file();
         self.name = String::from(new_name);
-        self.store();
+        self.store()
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -76,35 +77,38 @@ impl Robot {
         self.battery_level += power;
     }
 
-    pub fn load(robot_name: String) -> Option<Self> {
-        ProjectDirs::from("de", "marc", "rustytherobot")
-            .map(|project_dirs| project_dirs.config_dir().join(format!("{robot_name}.json")))
-            .and_then(|file| {
-                std::fs::read_to_string(&file)
-                    .inspect_err(|err| warn!("could not read file {file:?}: {err}"))
-                    .ok()
-            })
-            .and_then(|data| {
-                serde_json::from_str::<Robot>(&data)
-                    .inspect_err(|err| warn!("could not deserialize: {err}"))
-                    .ok()
-            })
+    pub fn load(robot_name: String) -> Result<Self> {
+        let file = ProjectDirs::from("de", "marc", "rustytherobot")
+            .context("could not determine configuration directory")?
+            .config_dir()
+            .join(format!("{robot_name}.json"));
+
+        let data = std::fs::read_to_string(&file)
+            .with_context(|| format!("could not read robot file {file:?}"))?;
+
+        let robot = serde_json::from_str::<Robot>(&data)
+            .with_context(|| format!("could not deserialize robot {file:?}"))?;
+
+        Ok(robot)
     }
 
-    pub fn store(&self) {
+    pub fn store(&self) -> Result<()> {
         let config_dir = ProjectDirs::from("de", "marc", "rustytherobot")
-            .map(|project_dirs| project_dirs.config_dir().to_path_buf());
+            .context("could not determine configuration directory")?
+            .config_dir()
+            .to_path_buf();
 
-        if let Some(config_dir) = config_dir.as_ref() {
-            let data = serde_json::to_string_pretty(self).unwrap();
-            std::fs::create_dir_all(config_dir)
-                .inspect_err(|err| error!("could not create dir {config_dir:?}: {err}"))
-                .ok();
-            let path = config_dir.join(format!("{robot_name}.json", robot_name = self.name));
-            std::fs::write(&path, data)
-                .inspect_err(|err| error!("cannot write file {path:?}: {err}"))
-                .ok();
-        }
+        std::fs::create_dir_all(&config_dir)
+            .with_context(|| format!("could not create directory {config_dir:?}"))?;
+
+        let data = serde_json::to_string_pretty(self).context("could not serialize robot")?;
+
+        let path = config_dir.join(format!("{}.json", self.name));
+
+        std::fs::write(&path, data)
+            .with_context(|| format!("could not write robot file {path:?}"))?;
+
+        Ok(())
     }
 }
 impl Movable for Robot {

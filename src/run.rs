@@ -7,7 +7,9 @@ use tracing::{error, info, warn};
 pub fn run(cli: Cli) {
     info!("run with cli {cli:?}", cli = cli);
 
-    let _config = Config::load().unwrap_or_default();
+    let _config = Config::load()
+        .inspect_err(|err| warn!("{err}"))
+        .unwrap_or_default();
 
     // load state
     let robot_name = cli.robot_name;
@@ -15,26 +17,36 @@ pub fn run(cli: Cli) {
 
     match cli.command {
         Command::Info(_) => robot.map_or_else(
-            || error!("robot {robot_name} does not exist"),
+            |err| error!("robot {robot_name} does not exist: {err}"),
             |robot| println!("Robot position: {robot}"),
         ),
         Command::Rename(RenameCommand { new_name }) => {
             robot.map_or_else(
-                || error!("robot {robot_name} does not exist"),
-                |mut robot| robot.rename(&new_name),
+                |err| error!("robot {robot_name} does not exist: {err}"),
+                |mut robot| {
+                    robot
+                        .rename(&new_name)
+                        .inspect_err(|err| {
+                            error!("could not rename robot {robot_name} to {new_name}: {err}")
+                        })
+                        .ok();
+                },
             );
         }
         Command::Delete(_) => {
             robot.map_or_else(
-                || error!("robot {robot_name} does not exist"),
+                |err| error!("robot {robot_name} does not exist: {err}"),
                 |robot| robot.remove_file(),
             );
         }
         Command::Create(_) => {
-            if robot.is_some() {
+            if robot.is_ok() {
                 warn!("Could not create robot: already exist");
             } else {
-                Robot::new(robot_name).store();
+                Robot::new(robot_name.clone())
+                    .store()
+                    .inspect_err(|err| error!("could not store robot {robot_name}: {err}"))
+                    .ok();
             }
         }
         Command::Move(MoveCommand { direction }) => {
@@ -66,7 +78,15 @@ pub fn run(cli: Cli) {
                 }
             }
             println!("New robot position: {robot}");
-            robot.store();
+            robot
+                .store()
+                .inspect_err(|err| {
+                    error!(
+                        "could not store robot {robot_name}: {err}",
+                        robot_name = robot.name()
+                    )
+                })
+                .ok();
         }
     }
 }
