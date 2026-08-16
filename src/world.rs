@@ -1,19 +1,70 @@
+use crate::config::Config;
+use crate::position::Position;
 use crate::robot::{self, Robot};
 use anyhow::{Context, Result, anyhow};
 use directories::ProjectDirs;
+use rand::rng;
+use rand::seq::SliceRandom;
+use ron::ser::to_string_pretty;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tile::Tile;
 use tracing::info;
 
-pub mod wall;
+pub mod tile;
 
-const WORLD_DATA_FILE: &str = "world_state.json";
+const WORLD_DATA_FILE: &str = "world_state.ron";
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct World {
     robots: Vec<Robot>,
+    tiles: HashMap<Position, Tile>,
 }
 
 impl World {
+    pub fn new(config: Config) -> Self {
+        let mut world = Self::default();
+        let min = Position::new(-config.world_size.x / 2, -config.world_size.y / 2);
+        let max = Position::new(
+            config.world_size.x + min.x - 1,
+            config.world_size.y + min.y - 1,
+        ); // correct by 1 because we have a position 0/0... for 5x5 we have # -2 -1 0 1 2 #
+
+        for x in (min.x - 1)..=(max.x + 1) {
+            world.tiles.insert(Position::new(x, min.y - 1), Tile::Wall);
+            world.tiles.insert(Position::new(x, max.y + 1), Tile::Wall);
+        }
+
+        for y in (min.y - 1)..=(max.y + 1) {
+            world.tiles.insert(Position::new(min.x - 1, y), Tile::Wall);
+            world.tiles.insert(Position::new(max.x + 1, y), Tile::Wall);
+        }
+
+        // Charging Pads
+
+        let field_count = config.world_size.x * config.world_size.y;
+        let charging_pad_count = (field_count as f64 * config.chargingpad_ratio).round() as usize;
+        world.insert_charging_pads(min, max, charging_pad_count);
+        world
+    }
+
+    fn insert_charging_pads(&mut self, min: Position, max: Position, count: usize) {
+        let mut positions = Vec::new();
+
+        for x in min.x..=max.x {
+            for y in min.y..=max.y {
+                positions.push(Position::new(x, y));
+            }
+        }
+
+        let mut rng = rng();
+        positions.shuffle(&mut rng);
+
+        for i in 0..count {
+            self.tiles.insert(positions[i].clone(), Tile::ChargingPad);
+        }
+    }
+
     pub fn robot(&self, robot_name: &str) -> Option<&Robot> {
         for robot in &self.robots {
             if robot.name() == robot_name {
@@ -53,10 +104,10 @@ impl World {
             .join(WORLD_DATA_FILE);
 
         let data = std::fs::read_to_string(&file)
-            .with_context(|| format!("could not read robot file {file:?}"))?;
+            .with_context(|| format!("could not read world file {file:?}"))?;
 
-        let world = serde_json::from_str::<World>(&data)
-            .with_context(|| format!("could not deserialize robot {file:?}"))?;
+        let world = ron::from_str::<World>(&data)
+            .with_context(|| format!("could not deserialize world {file:?}"))?;
         info!("loaded world from {file:?}");
         Ok(world)
     }
@@ -70,18 +121,51 @@ impl World {
         std::fs::create_dir_all(&data_dir)
             .with_context(|| format!("could not create directory {data_dir:?}"))?;
 
-        let data = serde_json::to_string_pretty(self).context("could not serialize robot")?;
+        let data = to_string_pretty(self, ron::ser::PrettyConfig::default())
+            .context("could not serialize world")?;
 
         let path = data_dir.join(WORLD_DATA_FILE);
 
         std::fs::write(&path, data)
-            .with_context(|| format!("could not write robot file {path:?}"))?;
+            .with_context(|| format!("could not write world file {path:?}"))?;
+
+        Ok(())
+    }
+    fn draw_tiles(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let min_x = self.tiles.keys().map(|p| p.x).min().unwrap_or(0);
+        let max_x = self.tiles.keys().map(|p| p.x).max().unwrap_or(0);
+        let min_y = self.tiles.keys().map(|p| p.y).min().unwrap_or(0);
+        let max_y = self.tiles.keys().map(|p| p.y).max().unwrap_or(0);
+
+        for y in (min_y..=max_y).rev() {
+            for x in min_x..=max_x {
+                let position = Position::new(x, y);
+
+                let mut symbol = match self.tiles.get(&position) {
+                    Some(Tile::Wall) => '#',
+                    Some(Tile::ChargingPad) => 'C',
+                    None => '.',
+                };
+                for robot in &self.robots {
+                    if robot.position() == &position {
+                        symbol = 'R';
+                    }
+                }
+                write!(f, "{symbol} ")?;
+            }
+
+            writeln!(f)?;
+        }
 
         Ok(())
     }
 }
+
 impl std::fmt::Display for World {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        self.draw_tiles(f)?;
+        writeln!(f)?;
         writeln!(f, "World contains {} robots:", self.robots.len())?;
 
         for robot in &self.robots {

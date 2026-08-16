@@ -37,6 +37,11 @@ impl Robot {
         );
         self.name = String::from(new_name);
     }
+
+    pub fn position(&self) -> &Position {
+        &self.position
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }

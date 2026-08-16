@@ -10,13 +10,15 @@ use tracing::{error, info, warn};
 pub fn run(cli: Cli) {
     info!("run with cli {cli:?}", cli = cli);
 
-    let _config = Config::load()
+    let config = Config::load()
         .inspect_err(|err| warn!("{err}"))
         .unwrap_or_default();
 
     // load state
     let robot_name = cli.robot_name;
-    let mut world = World::load().unwrap_or_default();
+    let mut world = World::load()
+        .inspect_err(|err| error!("could not load world: {err}"))
+        .unwrap_or(World::new(config));
 
     match cli.command {
         Command::Info(_) => {
@@ -36,19 +38,11 @@ pub fn run(cli: Cli) {
                 |err| error!("robot {robot_name} does not exist: {err}"),
                 |robot| robot.rename(&new_name),
             );
-            world
-                .store()
-                .inspect_err(|err| error!("could not store world state: {err}",))
-                .ok();
         }
         Command::Delete(_) => {
             world
                 .remove_robot(&robot_name)
                 .inspect_err(|err| error!("robot {robot_name} could not be deleted: {err}"))
-                .ok();
-            world
-                .store()
-                .inspect_err(|err| error!("could not store world state: {err}",))
                 .ok();
         }
         Command::Create(_) => {
@@ -56,10 +50,6 @@ pub fn run(cli: Cli) {
                 warn!("Could not create robot: already exist");
             } else {
                 world.add_robot(Robot::new(robot_name.clone()));
-                world
-                    .store()
-                    .inspect_err(|err| error!("could not store world state: {err}",))
-                    .ok();
             }
         }
         Command::Move(MoveCommand { direction }) => {
@@ -76,13 +66,11 @@ pub fn run(cli: Cli) {
                         .ok();
                 },
             );
-
-            world
-                .store()
-                .inspect_err(|err| error!("could not store world state: {err}",))
-                .ok();
         }
     }
-
+    world
+        .store()
+        .inspect_err(|err| error!("could not store world state: {err}",))
+        .ok();
     info!("world state: {world}");
 }

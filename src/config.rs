@@ -4,15 +4,15 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 const CONFIG_FILENAME: &str = "config.ron";
-const DEFAULT_WORLD_SIZE: Dimension = Dimension { x: 100, y: 100 };
+const DEFAULT_WORLD_SIZE: Dimension = Dimension { x: 5, y: 5 };
 const DEFAULT_WALL_RATIO: f64 = 0.1;
 const DEFAULT_CARGINGPAD_RATIO: f64 = 0.05;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
-    world_size: Dimension,
-    wall_ratio: f64,
-    chargingpad_ratio: f64,
+    pub world_size: Dimension,
+    pub wall_ratio: f64,
+    pub chargingpad_ratio: f64,
 }
 
 impl Default for Config {
