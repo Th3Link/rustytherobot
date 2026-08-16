@@ -2,7 +2,6 @@ use crate::dimension::Dimension;
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
 const CONFIG_FILENAME: &str = "config.ron";
 const DEFAULT_WORLD_SIZE: Dimension = Dimension { x: 100, y: 100 };

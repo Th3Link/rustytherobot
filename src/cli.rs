@@ -1,3 +1,4 @@
+use crate::direction::Direction;
 use argh::FromArgs;
 
 #[derive(FromArgs, Debug)]
@@ -57,6 +58,17 @@ pub enum MoveDirection {
     Down(Down),
     Left(Left),
     Right(Right),
+}
+
+impl From<MoveDirection> for Direction {
+    fn from(direction: MoveDirection) -> Self {
+        match direction {
+            MoveDirection::Up(up) => Direction::Up(up.steps),
+            MoveDirection::Down(_) => Direction::Down,
+            MoveDirection::Left(_) => Direction::Left,
+            MoveDirection::Right(_) => Direction::Right,
+        }
+    }
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

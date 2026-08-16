@@ -1,9 +1,12 @@
-use crate::cli::{Cli, Command, MoveCommand, MoveDirection, RenameCommand, Up};
+use crate::cli::{Cli, Command, MoveCommand, RenameCommand};
 use crate::config::Config;
-use crate::direction::Direction;
 use crate::robot::Movable;
 use crate::robot::Robot;
+use crate::world::World;
+use anyhow::anyhow;
+
 use tracing::{error, info, warn};
+
 pub fn run(cli: Cli) {
     info!("run with cli {cli:?}", cli = cli);
 
@@ -13,80 +16,73 @@ pub fn run(cli: Cli) {
 
     // load state
     let robot_name = cli.robot_name;
-    let robot = Robot::load(robot_name.clone());
+    let mut world = World::load().unwrap_or_default();
 
     match cli.command {
-        Command::Info(_) => robot.map_or_else(
-            |err| error!("robot {robot_name} does not exist: {err}"),
-            |robot| println!("Robot position: {robot}"),
-        ),
-        Command::Rename(RenameCommand { new_name }) => {
+        Command::Info(_) => {
+            let robot = world
+                .robot(&robot_name)
+                .ok_or_else(|| anyhow!("Robot not found in world"));
             robot.map_or_else(
                 |err| error!("robot {robot_name} does not exist: {err}"),
-                |mut robot| {
-                    robot
-                        .rename(&new_name)
-                        .inspect_err(|err| {
-                            error!("could not rename robot {robot_name} to {new_name}: {err}")
-                        })
-                        .ok();
-                },
+                |robot| println!("Robot position: {robot}"),
+            )
+        }
+        Command::Rename(RenameCommand { new_name }) => {
+            let robot = world
+                .robot_mut(&robot_name)
+                .ok_or_else(|| anyhow!("Robot not found in world"));
+            robot.map_or_else(
+                |err| error!("robot {robot_name} does not exist: {err}"),
+                |robot| robot.rename(&new_name),
             );
+            world
+                .store()
+                .inspect_err(|err| error!("could not store world state: {err}",))
+                .ok();
         }
         Command::Delete(_) => {
-            robot.map_or_else(
-                |err| error!("robot {robot_name} does not exist: {err}"),
-                |robot| robot.remove_file(),
-            );
+            world
+                .remove_robot(&robot_name)
+                .inspect_err(|err| error!("robot {robot_name} could not be deleted: {err}"))
+                .ok();
+            world
+                .store()
+                .inspect_err(|err| error!("could not store world state: {err}",))
+                .ok();
         }
         Command::Create(_) => {
-            if robot.is_ok() {
+            if world.robot(&robot_name).is_some() {
                 warn!("Could not create robot: already exist");
             } else {
-                Robot::new(robot_name.clone())
+                world.add_robot(Robot::new(robot_name.clone()));
+                world
                     .store()
-                    .inspect_err(|err| error!("could not store robot {robot_name}: {err}"))
+                    .inspect_err(|err| error!("could not store world state: {err}",))
                     .ok();
             }
         }
         Command::Move(MoveCommand { direction }) => {
-            let mut robot = robot.unwrap_or(Robot::new(robot_name));
-            match direction {
-                MoveDirection::Up(Up { steps }) => {
+            let robot = world
+                .robot_mut(&robot_name)
+                .ok_or_else(|| anyhow!("Robot not found in world"));
+            robot.map_or_else(
+                |err| error!("robot {robot_name} does not exist: {err}"),
+                |robot| {
                     robot
-                        .move_robot(Direction::Up(steps))
-                        .inspect_err(|err| warn!("Could not move robot: {err:?}"))
+                        .move_robot(direction.into())
+                        .inspect(|_| println!("New robot position: {robot}"))
+                        .inspect_err(|err| error!("could not move robot {robot_name}: {err:?}"))
                         .ok();
-                }
-                MoveDirection::Down(_) => {
-                    robot
-                        .move_robot(Direction::Down)
-                        .inspect_err(|err| warn!("Could not move robot: {err:?}"))
-                        .ok();
-                }
-                MoveDirection::Left(_) => {
-                    robot
-                        .move_robot(Direction::Left)
-                        .inspect_err(|err| warn!("Could not move robot: {err:?}"))
-                        .ok();
-                }
-                MoveDirection::Right(_) => {
-                    robot
-                        .move_robot(Direction::Right)
-                        .inspect_err(|err| warn!("Could not move robot: {err:?}"))
-                        .ok();
-                }
-            }
-            println!("New robot position: {robot}");
-            robot
+                },
+            );
+
+            world
                 .store()
-                .inspect_err(|err| {
-                    error!(
-                        "could not store robot {robot_name}: {err}",
-                        robot_name = robot.name()
-                    )
-                })
+                .inspect_err(|err| error!("could not store world state: {err}",))
                 .ok();
         }
     }
+
+    info!("world state: {world}");
 }
