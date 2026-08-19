@@ -30,15 +30,30 @@ impl World {
             config.world_size.y + min.y - 1,
         ); // correct by 1 because we have a position 0/0... for 5x5 we have # -2 -1 0 1 2 #
 
-        for x in (min.x - 1)..=(max.x + 1) {
-            world.tiles.insert(Position::new(x, min.y - 1), Tile::Wall);
-            world.tiles.insert(Position::new(x, max.y + 1), Tile::Wall);
+        let left = min.x - 1;
+        let right = max.x + 1;
+        let bottom = min.y - 1;
+        let top = max.y + 1;
+
+        for x in left..=right {
+            world.tiles.insert(Position::new(x, bottom), Tile::Wall);
+            world.tiles.insert(Position::new(x, top), Tile::Wall);
         }
 
-        for y in (min.y - 1)..=(max.y + 1) {
-            world.tiles.insert(Position::new(min.x - 1, y), Tile::Wall);
-            world.tiles.insert(Position::new(max.x + 1, y), Tile::Wall);
+        for y in bottom..=top {
+            world.tiles.insert(Position::new(left, y), Tile::Wall);
+            world.tiles.insert(Position::new(right, y), Tile::Wall);
         }
+
+        /* alternative (but is ir worth it?):
+        let positions = (left..=right)
+            .flat_map(|x| [Position::new(x, bottom), Position::new(x, top)])
+            .chain((bottom..=top).flat_map(|y| [Position::new(left, y), Position::new(right, y)]));
+
+        for position in positions {
+            world.tiles.insert(position, Tile::Wall);
+        }
+        */
 
         // Charging Pads
 
@@ -56,7 +71,12 @@ impl World {
                 positions.push(Position::new(x, y));
             }
         }
-
+        /* alternative:
+        positions.extend(
+            (min.x..=max.x)
+                .flat_map(|x| (min.y..=max.y).map(move |y| Position::new(x, y))),
+        );
+        */
         let mut rng = rng();
         positions.shuffle(&mut rng);
         positions.into_iter().take(count).for_each(|cp| {
@@ -84,13 +104,13 @@ impl World {
     }
 
     pub fn remove_robot(&mut self, robot_name: &str) -> Result<()> {
-        for i in 0..self.robots.len() {
-            if self.robots[i].name() == robot_name {
-                self.robots.remove(i);
-                return Ok(());
-            }
-        }
-        Err(anyhow!("robot with name {robot_name} not found"))
+        let pos = self
+            .robots
+            .iter()
+            .position(|robot| robot.name() == robot_name)
+            .ok_or_else(|| anyhow!("robot with name {robot_name} not found"))?;
+        self.robots.remove(pos);
+        Ok(())
     }
 
     pub fn add_robot(&mut self, robot: Robot) {
@@ -139,25 +159,28 @@ impl World {
 
         for y in (min_y..=max_y).rev() {
             for x in min_x..=max_x {
-                let position = Position::new(x, y);
-
-                let mut symbol = match self.tiles.get(&position) {
-                    Some(Tile::Wall) => '#',
-                    Some(Tile::ChargingPad) => 'C',
-                    None => '.',
-                };
-                for robot in &self.robots {
-                    if robot.position() == &position {
-                        symbol = 'R';
-                    }
-                }
-                write!(f, "{symbol} ")?;
+                write!(f, "{} ", self.symbol_at(Position::new(x, y)))?;
             }
 
             writeln!(f)?;
         }
 
         Ok(())
+    }
+    fn symbol_at(&self, position: Position) -> char {
+        if self
+            .robots
+            .iter()
+            .any(|robot| robot.position() == &position)
+        {
+            return 'R';
+        }
+
+        match self.tiles.get(&position) {
+            Some(Tile::Wall) => '#',
+            Some(Tile::ChargingPad) => 'C',
+            None => '.',
+        }
     }
 }
 
