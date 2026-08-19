@@ -59,28 +59,28 @@ impl World {
 
         let mut rng = rng();
         positions.shuffle(&mut rng);
-
-        for i in 0..count {
-            self.tiles.insert(positions[i].clone(), Tile::ChargingPad);
+        positions.into_iter().take(count).for_each(|cp| {
+            self.tiles.insert(cp, Tile::ChargingPad);
+        });
+        /* alternative:
+        for cp in positions.into_iter().take(count) {
+            self.tiles.insert(cp, Tile::ChargingPad);
         }
+        */
     }
 
     pub fn robot(&self, robot_name: &str) -> Option<&Robot> {
-        for robot in &self.robots {
-            if robot.name() == robot_name {
-                return Some(robot);
-            }
-        }
-        None
+        self.robots
+            .iter()
+            .find(|&robot| robot.name() == robot_name)
+            .map(|v| v as _)
     }
 
     pub fn robot_mut(&mut self, robot_name: &str) -> Option<&mut Robot> {
-        for robot in &mut self.robots {
-            if robot.name() == robot_name {
-                return Some(robot);
-            }
-        }
-        None
+        self.robots
+            .iter_mut()
+            .find(|robot| robot.name() == robot_name)
+            .map(|v| v as _)
     }
 
     pub fn remove_robot(&mut self, robot_name: &str) -> Result<()> {
