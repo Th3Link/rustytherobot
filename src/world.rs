@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::position::Position;
-use crate::robot::{self, Robot};
+use crate::robot::Robot;
 use anyhow::{Context, Result, anyhow};
 use directories::ProjectDirs;
 use rand::rng;

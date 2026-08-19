@@ -46,7 +46,7 @@ impl Robot {
         &self.name
     }
 
-    pub fn would_collide(&self, direction: Direction, other_robot: &Robot) -> bool {
+    /*pub fn would_collide(&self, direction: Direction, other_robot: &Robot) -> bool {
         let mut new_position = self.position.clone();
         if let Direction::Up(distance) = direction {
             new_position.y += distance;
@@ -63,7 +63,7 @@ impl Robot {
 
     pub fn charge(&mut self, power: i32) {
         self.battery_level += power;
-    }
+    }*/
 }
 impl Movable for Robot {
     fn move_robot(&mut self, direction: Direction) -> Result<(), MovementError> {
@@ -84,7 +84,7 @@ impl Movable for Robot {
                 self.battery_level -= 1;
             }
             Direction::Right => {
-                self.position.x += 1;
+                self.position.x -= 1;
                 self.battery_level -= 1;
             }
         }
