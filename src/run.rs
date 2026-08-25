@@ -1,7 +1,5 @@
-use crate::cli::{Cli, Command, MoveCommand, RenameCommand};
+use crate::cli::{AttackCommand, Cli, Command, MoveCommand, RenameCommand};
 use crate::config::Config;
-use crate::robot::Movable;
-use crate::robot::Robot;
 use crate::world::World;
 use anyhow::anyhow;
 
@@ -49,23 +47,32 @@ pub fn run(cli: Cli) {
             if world.robot(&robot_name).is_some() {
                 warn!("Could not create robot: already exist");
             } else {
-                world.add_robot(Robot::new(robot_name.clone()));
+                world.add_robot(robot_name.clone());
             }
         }
         Command::Move(MoveCommand { direction }) => {
-            let robot = world
-                .robot_mut(&robot_name)
-                .ok_or_else(|| anyhow!("Robot not found in world"));
-            robot.map_or_else(
-                |err| error!("robot {robot_name} does not exist: {err}"),
-                |robot| {
-                    robot
-                        .move_robot(direction.into())
-                        .inspect(|_| println!("New robot position: {robot}"))
-                        .inspect_err(|err| error!("could not move robot {robot_name}: {err:?}"))
-                        .ok();
-                },
-            );
+            world
+                .execute_move(&robot_name, direction.into())
+                .inspect_err(|err| error!("{err}"))
+                .ok();
+        }
+        Command::Attack(AttackCommand { power }) => {
+            world
+                .execute_attack(&robot_name, power)
+                .inspect_err(|err| error!("{err}"))
+                .ok();
+        }
+        Command::TransferCharge(_) => {
+            world
+                .execute_charge_transfer(&robot_name)
+                .inspect_err(|err| error!("{err}"))
+                .ok();
+        }
+        Command::Repair(_) => {
+            world
+                .execute_repair(&robot_name)
+                .inspect_err(|err| error!("{err}"))
+                .ok();
         }
     }
     world

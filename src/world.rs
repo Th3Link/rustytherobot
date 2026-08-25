@@ -1,7 +1,8 @@
 use crate::config::Config;
+use crate::direction::Direction;
 use crate::position::Position;
-use crate::robot::Robot;
-use anyhow::{Context, Result, anyhow};
+use crate::robot::{MAX_BATTERY_LEVEL, Movable, Robot};
+use anyhow::{Context, Result, anyhow, bail};
 use directories::ProjectDirs;
 use rand::rng;
 use rand::seq::SliceRandom;
@@ -19,6 +20,7 @@ const WORLD_DATA_FILE: &str = "world_state.ron";
 pub struct World {
     robots: Vec<Robot>,
     tiles: HashMap<Position, Tile>,
+    next_team_id: i32,
 }
 
 impl World {
@@ -113,8 +115,115 @@ impl World {
         Ok(())
     }
 
-    pub fn add_robot(&mut self, robot: Robot) {
-        self.robots.push(robot);
+    pub fn add_robot(&mut self, robot_name: String) {
+        self.robots.push(Robot::new(robot_name, self.next_team_id));
+        self.next_team_id += 1;
+    }
+
+    pub fn execute_attack(&mut self, robot_name: &str, power: i32) -> Result<()> {
+        let robot = self
+            .robots
+            .iter_mut()
+            .find(|robot| robot.name() == robot_name)
+            .ok_or(anyhow!("robot with name {robot_name} not found"))?;
+        let position = robot.position().clone();
+        let team_id = robot.team_id();
+        let damage = robot.attack(power);
+        self.robots_mut_in_range(&position, 1)
+            .iter_mut()
+            .filter(|robot| robot.team_id() != team_id)
+            .for_each(|robot| robot.take_damage(damage));
+        Ok(())
+    }
+
+    pub fn execute_repair(&mut self, robot_name: &str) -> Result<()> {
+        let robot = self
+            .robots
+            .iter_mut()
+            .find(|robot| robot.name() == robot_name)
+            .ok_or(anyhow!("robot with name {robot_name} not found"))?;
+        let position = robot.position().clone();
+        let team_id = robot.team_id();
+        robot.perform_repair()?;
+        self.robots_mut_in_range(&position, 1)
+            .iter_mut()
+            .for_each(|robot| robot.repair(team_id));
+        Ok(())
+    }
+
+    pub fn execute_charge_transfer(&mut self, robot_name: &str) -> Result<()> {
+        let robot = self
+            .robots
+            .iter()
+            .find(|robot| robot.name() == robot_name)
+            .ok_or(anyhow!("robot with name {robot_name} not found"))?;
+        let position = robot.position().clone();
+        let team_id = robot.team_id();
+        let robot_count = self.robots_in_range(&position, 1).len() as i32;
+        let robot = self
+            .robots
+            .iter_mut()
+            .find(|robot| robot.name() == robot_name)
+            .ok_or(anyhow!("robot with name {robot_name} not found"))?;
+        let charge_transfer = robot.charge_transfer(robot_count);
+        self.robots_mut_in_range(&position, 1)
+            .iter_mut()
+            .for_each(|robot| robot.recharge(charge_transfer, team_id));
+        Ok(())
+    }
+
+    pub fn execute_move(&mut self, robot_name: &str, direction: Direction) -> Result<()> {
+        let path_free = self.robot(robot_name).is_some_and(|r| {
+            r.path(direction.clone())
+                .iter()
+                .all(|position| !self.is_wall(position) && !self.is_occupied_by_robot(position))
+        });
+        if !path_free {
+            bail!("path is not free");
+        }
+
+        let position = {
+            let robot = self
+                .robot_mut(robot_name)
+                .ok_or(anyhow!("robot {robot_name} not found"))?;
+
+            robot.move_robot(direction)?;
+            robot.position().clone()
+        };
+        if self.is_in_charging_range(&position, 1) {
+            let robot = self.robot_mut(robot_name).unwrap();
+            robot.recharge(MAX_BATTERY_LEVEL, robot.team_id());
+        }
+
+        Ok(())
+    }
+
+    fn is_occupied_by_robot(&self, position: &Position) -> bool {
+        self.robots.iter().any(|robot| robot.position() == position)
+    }
+
+    fn is_wall(&self, position: &Position) -> bool {
+        matches!(self.tiles.get(position), Some(Tile::Wall))
+    }
+
+    fn robots_mut_in_range(&mut self, position: &Position, range: i32) -> Vec<&mut Robot> {
+        self.robots
+            .iter_mut()
+            .filter(|robot| robot.position().distance_to(position) <= range)
+            .collect()
+    }
+
+    fn robots_in_range(&self, position: &Position, range: i32) -> Vec<&Robot> {
+        self.robots
+            .iter()
+            .filter(|robot| robot.position().distance_to(position) <= range)
+            .collect()
+    }
+
+    fn is_in_charging_range(&self, position: &Position, range: i32) -> bool {
+        self.tiles.iter().any(|(tile_position, tile)| {
+            matches!(tile, Tile::ChargingPad) && position.distance_to(tile_position) <= range
+        })
     }
 
     pub fn load() -> Result<Self> {
@@ -151,6 +260,7 @@ impl World {
 
         Ok(())
     }
+
     fn draw_tiles(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let min_x = self.tiles.keys().map(|p| p.x).min().unwrap_or(0);
         let max_x = self.tiles.keys().map(|p| p.x).max().unwrap_or(0);
@@ -167,6 +277,7 @@ impl World {
 
         Ok(())
     }
+
     fn symbol_at(&self, position: Position) -> char {
         if self
             .robots

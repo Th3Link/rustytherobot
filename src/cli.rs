@@ -15,11 +15,41 @@ pub struct Cli {
 #[argh(subcommand)]
 pub enum Command {
     Move(MoveCommand),
+    Attack(AttackCommand),
+    TransferCharge(TransferChargeCommand),
+    Repair(RepairCommand),
     Info(InfoCommand),
     Rename(RenameCommand),
     Delete(DeleteCommand),
     Create(CreateCommand),
 }
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "attack",
+    description = "attacks all hostile robots near by"
+)]
+pub struct AttackCommand {
+    #[argh(positional)]
+    pub power: i32,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "repair",
+    description = "repairs all friendly robots near by"
+)]
+pub struct RepairCommand {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "tranfer",
+    description = "split power between all friendly robots near by"
+)]
+pub struct TransferChargeCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "rename", description = "rename the robot")]
