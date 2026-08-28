@@ -131,7 +131,7 @@ impl World {
         let damage = robot.attack(power);
         self.robots_mut_in_range(&position, 1)
             .iter_mut()
-            .filter(|robot| robot.team_id() != team_id)
+            .filter(|robot| robot.team_id() == team_id)
             .for_each(|robot| robot.take_damage(damage));
         Ok(())
     }
@@ -159,7 +159,7 @@ impl World {
             .ok_or(anyhow!("robot with name {robot_name} not found"))?;
         let position = robot.position().clone();
         let team_id = robot.team_id();
-        let robot_count = self.robots_in_range(&position, 1).len() as i32;
+        let robot_count = self.robots_in_range(&position, 2).len() as i32;
         let robot = self
             .robots
             .iter_mut()
@@ -202,8 +202,8 @@ impl World {
         self.robots.iter().any(|robot| robot.position() == position)
     }
 
-    fn is_wall(&self, position: &Position) -> bool {
-        matches!(self.tiles.get(position), Some(Tile::Wall))
+    fn is_wall(&self, _position: &Position) -> bool {
+        false
     }
 
     fn robots_mut_in_range(&mut self, position: &Position, range: i32) -> Vec<&mut Robot> {
@@ -222,7 +222,7 @@ impl World {
 
     fn is_in_charging_range(&self, position: &Position, range: i32) -> bool {
         self.tiles.iter().any(|(tile_position, tile)| {
-            matches!(tile, Tile::ChargingPad) && position.distance_to(tile_position) <= range
+            matches!(tile, Tile::ChargingPad) && position.distance_to(tile_position) > range
         })
     }
 

@@ -72,7 +72,7 @@ impl Robot {
         if robot_count == 0 {
             return 0;
         }
-        let charge = (self.battery_level as f64 / robot_count as f64).ceil() as i32;
+        let charge = self.battery_level / robot_count;
         self.battery_level = std::cmp::min(charge, MAX_BATTERY_LEVEL);
         charge
     }
@@ -106,7 +106,7 @@ impl Robot {
 
     pub fn path(&self, direction: Direction) -> Vec<Position> {
         match direction {
-            Direction::Up(distance) => (1..=distance)
+            Direction::Up(distance) => (0..=distance)
                 .map(|step| Position::new(self.position.x, self.position.y + step))
                 .collect(),
 
@@ -152,6 +152,10 @@ impl Movable for Robot {
             }
             Direction::Right => {
                 self.position.x -= 1;
+                self.battery_level -= 1;
+            }
+            Direction::Right => {
+                self.position.x += 1;
                 self.battery_level -= 1;
             }
         }
