@@ -1,5 +1,6 @@
 pub mod cli;
 mod config;
+mod dbus;
 mod dimension;
 mod direction;
 mod position;

@@ -8,7 +8,7 @@ fn main() {
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.´
         .with_env_filter("info")
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         // completes the builder.
         .finish();
 
@@ -16,5 +16,5 @@ fn main() {
 
     let cli: Cli = argh::from_env();
     info!("main started");
-    run(cli);
+    let _ = run(cli);
 }

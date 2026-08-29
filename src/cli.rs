@@ -4,9 +4,6 @@ use argh::FromArgs;
 #[derive(FromArgs, Debug)]
 #[argh(description = "rusty the robot")]
 pub struct Cli {
-    #[argh(positional, description = "name of the robot")]
-    pub robot_name: String,
-
     #[argh(subcommand)]
     pub command: Command,
 }
@@ -14,6 +11,27 @@ pub struct Cli {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum Command {
+    Robot(Robot),
+    DBus(DBus),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "dbus", description = "run the game in dbus mode")]
+pub struct DBus {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "robot", description = "command a robot")]
+pub struct Robot {
+    #[argh(positional, description = "name of the robot")]
+    pub robot_name: String,
+
+    #[argh(subcommand)]
+    pub robot_command: RobotCommand,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum RobotCommand {
     Move(MoveCommand),
     Attack(AttackCommand),
     TransferCharge(TransferChargeCommand),
