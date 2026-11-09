@@ -20,6 +20,27 @@ pub enum MovementError {
     BatteryEmpty,
 }
 
+#[derive(Debug, Clone)]
+pub struct Snapshot {
+    pub name: String,
+    pub position: Position,
+    pub battery_level: i32,
+    pub health: i32,
+    pub team_id: i32,
+}
+
+impl From<&Robot> for Snapshot {
+    fn from(robot: &Robot) -> Self {
+        Self {
+            name: robot.name.clone(),
+            position: robot.position.clone(),
+            battery_level: robot.battery_level,
+            health: robot.health,
+            team_id: robot.team_id,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Robot {
     name: String,
@@ -85,12 +106,16 @@ impl Robot {
         Ok(())
     }
 
-    pub fn repair(&mut self, team_id: i32) {
+    pub fn repair(&mut self, team_id: i32) -> bool {
         if team_id == self.team_id {
             self.health = MAX_HEALTH;
+            true
         } else if self.health == 0 {
             self.health = MAX_HEALTH;
             self.team_id = team_id;
+            true
+        } else {
+            false
         }
     }
 

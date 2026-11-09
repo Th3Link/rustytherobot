@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::direction::Direction;
 use crate::position::Position;
-use crate::robot::{MAX_BATTERY_LEVEL, Movable, Robot};
+use crate::robot::{MAX_BATTERY_LEVEL, Movable, Robot, Snapshot};
 use anyhow::{Context, Result, anyhow, bail};
 use directories::ProjectDirs;
 use rand::rng;
@@ -120,7 +120,7 @@ impl World {
         self.next_team_id += 1;
     }
 
-    pub fn execute_attack(&mut self, robot_name: &str, power: i32) -> Result<()> {
+    pub fn execute_attack(&mut self, robot_name: &str, power: i32) -> Result<Vec<Snapshot>> {
         let robot = self
             .robots
             .iter_mut()
@@ -133,10 +133,15 @@ impl World {
             .iter_mut()
             .filter(|robot| robot.team_id() != team_id)
             .for_each(|robot| robot.take_damage(damage));
-        Ok(())
+        Ok(self
+            .robots_in_range(&position, 1)
+            .into_iter()
+            .filter(|robot| robot.team_id() != team_id)
+            .map(Snapshot::from)
+            .collect())
     }
 
-    pub fn execute_repair(&mut self, robot_name: &str) -> Result<()> {
+    pub fn execute_repair(&mut self, robot_name: &str) -> Result<Vec<Snapshot>> {
         let robot = self
             .robots
             .iter_mut()
@@ -145,13 +150,21 @@ impl World {
         let position = robot.position().clone();
         let team_id = robot.team_id();
         robot.perform_repair()?;
-        self.robots_mut_in_range(&position, 1)
-            .iter_mut()
-            .for_each(|robot| robot.repair(team_id));
-        Ok(())
+        let repaired: Vec<Snapshot> = self
+            .robots_mut_in_range(&position, 1)
+            .into_iter()
+            .filter_map(|robot| {
+                if robot.repair(team_id) {
+                    Some(Snapshot::from(&*robot))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(repaired)
     }
 
-    pub fn execute_charge_transfer(&mut self, robot_name: &str) -> Result<()> {
+    pub fn execute_charge_transfer(&mut self, robot_name: &str) -> Result<Vec<Snapshot>> {
         let robot = self
             .robots
             .iter()
@@ -166,13 +179,17 @@ impl World {
             .find(|robot| robot.name() == robot_name)
             .ok_or(anyhow!("robot with name {robot_name} not found"))?;
         let charge_transfer = robot.charge_transfer(robot_count);
-        self.robots_mut_in_range(&position, 1)
-            .iter_mut()
-            .for_each(|robot| robot.recharge(charge_transfer, team_id));
-        Ok(())
+        Ok(self
+            .robots_mut_in_range(&position, 1)
+            .into_iter()
+            .map(|robot| {
+                robot.recharge(charge_transfer, team_id);
+                Snapshot::from(&*robot)
+            })
+            .collect())
     }
 
-    pub fn execute_move(&mut self, robot_name: &str, direction: Direction) -> Result<()> {
+    pub fn execute_move(&mut self, robot_name: &str, direction: Direction) -> Result<Snapshot> {
         let path_free = self.robot(robot_name).is_some_and(|r| {
             r.path(direction.clone())
                 .iter()
@@ -190,12 +207,19 @@ impl World {
             robot.move_robot(direction)?;
             robot.position().clone()
         };
+
         if self.is_in_charging_range(&position, 1) {
-            let robot = self.robot_mut(robot_name).unwrap();
+            let robot = self
+                .robot_mut(robot_name)
+                .ok_or(anyhow!("robot {robot_name} not found"))?;
             robot.recharge(MAX_BATTERY_LEVEL, robot.team_id());
         }
 
-        Ok(())
+        let robot = self
+            .robot(robot_name)
+            .ok_or(anyhow!("robot {robot_name} not found"))?;
+
+        Ok(Snapshot::from(robot))
     }
 
     fn is_occupied_by_robot(&self, position: &Position) -> bool {
@@ -226,13 +250,14 @@ impl World {
         })
     }
 
-    pub fn load() -> Result<Self> {
+    pub async fn load() -> Result<Self> {
         let file = ProjectDirs::from("de", "marc", "rustytherobot")
             .context("could not determine configuration directory")?
             .data_dir()
             .join(WORLD_DATA_FILE);
 
-        let data = std::fs::read_to_string(&file)
+        let data = smol::fs::read_to_string(&file)
+            .await
             .with_context(|| format!("could not read world file {file:?}"))?;
 
         let world = ron::from_str::<World>(&data)
@@ -241,13 +266,14 @@ impl World {
         Ok(world)
     }
 
-    pub fn store(&self) -> Result<()> {
+    pub async fn store(&self) -> Result<()> {
         let data_dir = ProjectDirs::from("de", "marc", "rustytherobot")
             .context("could not determine configuration directory")?
             .data_dir()
             .to_path_buf();
 
-        std::fs::create_dir_all(&data_dir)
+        smol::fs::create_dir_all(&data_dir)
+            .await
             .with_context(|| format!("could not create directory {data_dir:?}"))?;
 
         let data = to_string_pretty(self, ron::ser::PrettyConfig::default())
@@ -255,7 +281,8 @@ impl World {
 
         let path = data_dir.join(WORLD_DATA_FILE);
 
-        std::fs::write(&path, data)
+        smol::fs::write(&path, data)
+            .await
             .with_context(|| format!("could not write world file {path:?}"))?;
 
         Ok(())

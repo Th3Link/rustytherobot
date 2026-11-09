@@ -26,13 +26,14 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self> {
+    pub async fn load() -> Result<Self> {
         let file = ProjectDirs::from("de", "marc", "rustytherobot")
             .context("Could not determine configuration directory")?
             .config_dir()
             .join(CONFIG_FILENAME);
 
-        let data = std::fs::read_to_string(&file)
+        let data = smol::fs::read_to_string(&file)
+            .await
             .with_context(|| format!("Could not read configuration file {file:?}"))?;
 
         let config =

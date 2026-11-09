@@ -12,6 +12,7 @@ pub struct Cli {
 #[argh(subcommand)]
 pub enum Command {
     Robot(Robot),
+    World(World),
     DBus(DBus),
 }
 
@@ -28,6 +29,23 @@ pub struct Robot {
     #[argh(subcommand)]
     pub robot_command: RobotCommand,
 }
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "world", description = "commands on the world")]
+pub struct World {
+    #[argh(subcommand)]
+    pub world_command: WorldCommand,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum WorldCommand {
+    ListRobots(ListRobotsCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "list", description = "list all robots")]
+pub struct ListRobotsCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
@@ -106,6 +124,20 @@ pub enum MoveDirection {
     Down(Down),
     Left(Left),
     Right(Right),
+}
+
+impl TryFrom<(&str, i32)> for MoveDirection {
+    type Error = String;
+
+    fn try_from((direction, steps): (&str, i32)) -> Result<Self, Self::Error> {
+        match direction.to_ascii_lowercase().as_str() {
+            "up" => Ok(Self::Up(Up { steps })),
+            "down" => Ok(Self::Down(Down {})),
+            "left" => Ok(Self::Left(Left {})),
+            "right" => Ok(Self::Right(Right {})),
+            _ => Err(format!("invalid move direction: {direction}")),
+        }
+    }
 }
 
 impl From<MoveDirection> for Direction {

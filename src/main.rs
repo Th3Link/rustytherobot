@@ -16,5 +16,8 @@ fn main() {
 
     let cli: Cli = argh::from_env();
     info!("main started");
-    let _ = run(cli);
+    smol::block_on(async {
+        let _ = run(cli).await;
+    });
+    info!("end main");
 }

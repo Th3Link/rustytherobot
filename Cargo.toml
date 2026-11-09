@@ -14,4 +14,6 @@ ron                 = { version = "0.12" }
 anyhow              = { version = "1" }
 rand                = { version =  "0.10" }
 thiserror           = { version = "2" }
-zbus                = { version = "5.19" }
+zbus                = { version = "6" }
+smol                = { version = "2" }
+strum               = { version = "0.28", features = ["derive"] }
