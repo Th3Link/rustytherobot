@@ -83,19 +83,22 @@ impl Robot {
     }
 
     pub fn recharge(&mut self, battery_level: i32, team_id: i32) {
-        self.battery_level = std::cmp::max(MAX_BATTERY_LEVEL, self.battery_level + battery_level);
+        info!("recharge: {self:?}");
+        self.battery_level = std::cmp::min(MAX_BATTERY_LEVEL, self.battery_level + battery_level);
         if battery_level < MAX_BATTERY_LEVEL / 2 {
             self.team_id = team_id;
         }
     }
 
     pub fn charge_transfer(&mut self, robot_count: i32) -> i32 {
+        info!("charge_transfer: {self:?}");
         if robot_count == 0 {
             return 0;
         }
-        let charge = (self.battery_level as f64 / robot_count as f64).ceil() as i32;
-        self.battery_level = std::cmp::min(charge, MAX_BATTERY_LEVEL);
-        charge
+        let charge = self.battery_level as f64 / robot_count as f64;
+        self.battery_level = std::cmp::min(charge.ceil() as i32, MAX_BATTERY_LEVEL);
+        info!("charge_transfer: {self:?}, charge {charge}");
+        charge.floor() as i32
     }
 
     pub fn perform_repair(&mut self) -> Result<()> {
@@ -176,7 +179,7 @@ impl Movable for Robot {
                 self.battery_level -= 1;
             }
             Direction::Right => {
-                self.position.x -= 1;
+                self.position.x += 1;
                 self.battery_level -= 1;
             }
         }

@@ -24,7 +24,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: &Config) -> Self {
         let mut world = Self::default();
         let min = Position::new(-config.world_size.x / 2, -config.world_size.y / 2);
         let max = Position::new(
@@ -47,7 +47,7 @@ impl World {
             world.tiles.insert(Position::new(right, y), Tile::Wall);
         }
 
-        /* alternative (but is ir worth it?):
+        /* alternative (but is it worth it?):
         let positions = (left..=right)
             .flat_map(|x| [Position::new(x, bottom), Position::new(x, top)])
             .chain((bottom..=top).flat_map(|y| [Position::new(left, y), Position::new(right, y)]));
@@ -89,6 +89,18 @@ impl World {
             self.tiles.insert(cp, Tile::ChargingPad);
         }
         */
+    }
+    pub fn chargepads(&self) -> Vec<Position> {
+        self.tiles
+            .iter()
+            .filter(|t| t.1 == &Tile::ChargingPad)
+            .map(|t| t.0)
+            .cloned()
+            .collect()
+    }
+
+    pub fn robots(&self) -> Vec<String> {
+        self.robots.iter().map(|r| r.name().to_owned()).collect()
     }
 
     pub fn robot(&self, robot_name: &str) -> Option<&Robot> {
@@ -182,6 +194,7 @@ impl World {
         Ok(self
             .robots_mut_in_range(&position, 1)
             .into_iter()
+            .filter(|robot| robot.name() != robot_name)
             .map(|robot| {
                 robot.recharge(charge_transfer, team_id);
                 Snapshot::from(&*robot)

@@ -41,11 +41,29 @@ pub struct World {
 #[argh(subcommand)]
 pub enum WorldCommand {
     ListRobots(ListRobotsCommand),
+    BoardDimensions(BoardDimensionsCommand),
+    ListChargepads(ListChargepadsCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list", description = "list all robots")]
 pub struct ListRobotsCommand {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "board_dimensions",
+    description = "show dimensions of the board"
+)]
+pub struct BoardDimensionsCommand {}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "list_chargepads",
+    description = "list all chargepads"
+)]
+pub struct ListChargepadsCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use zbus::zvariant::Type;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Type)]
 pub struct Position {
     pub x: i32,
     pub y: i32,

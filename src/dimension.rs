@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use zbus::zvariant::Type;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Dimension {
     pub x: i32,
     pub y: i32,

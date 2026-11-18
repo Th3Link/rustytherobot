@@ -1,10 +1,14 @@
-use crate::cli::{self, AttackCommand, Cli, Command, MoveCommand, RenameCommand, RobotCommand};
+use crate::cli::{
+    self, AttackCommand, Cli, Command, MoveCommand, RenameCommand, RobotCommand, WorldCommand,
+};
 use crate::config::Config;
-use crate::dbus::{Robot, RobotSignals};
+use crate::dbus::{
+    Message as DbusMessage, Robot as DbusRobot, RobotSignals, World as DbusWorld, WorldReturn,
+};
 use crate::robot::Snapshot;
 use crate::world::World;
 use anyhow::anyhow;
-use smol::channel;
+use smol::{channel, future};
 use std::future::pending;
 use strum::{Display, EnumString};
 use tracing::{error, info, warn};
@@ -26,13 +30,13 @@ pub async fn run(cli: Cli) -> anyhow::Result<()> {
         .inspect_err(|err| warn!("{err}"))
         .unwrap_or_default();
 
-    let (command_channel_tx, command_channel_rx) = channel::bounded(20);
-
+    let (robot_command_channel_tx, robot_command_channel_rx) = channel::bounded(20);
+    let (world_command_channel_tx, world_command_channel_rx) = channel::bounded(20);
     // load state
     let mut world = World::load()
         .await
         .inspect_err(|err| error!("could not load world: {err}"))
-        .unwrap_or(World::new(config));
+        .unwrap_or(World::new(&config));
 
     match cli.command {
         Command::Robot(cli::Robot {
@@ -46,57 +50,132 @@ pub async fn run(cli: Cli) -> anyhow::Result<()> {
                 .inspect_err(|err| error!("could not store world state: {err}",))?;
             Ok(())
         }
+        Command::World(cli::World {
+            world_command: WorldCommand::ListRobots(_),
+        }) => {
+            info!("robots: {:?}", world.robots());
+            Ok(())
+        }
+        Command::World(cli::World {
+            world_command: WorldCommand::BoardDimensions(_),
+        }) => {
+            info!("board dimensions: {}", config.world_size);
+            Ok(())
+        }
+        Command::World(cli::World {
+            world_command: WorldCommand::ListChargepads(_),
+        }) => {
+            info!("chargepads: {:?}", world.chargepads());
+            Ok(())
+        }
         Command::DBus(_) => {
-            let robot = Robot::new(command_channel_tx);
+            let dbus_robot = DbusRobot::new(robot_command_channel_tx);
+            let dbus_world = DbusWorld::new(world_command_channel_tx);
             let connection = zbus::connection::Builder::session()
                 .name("dev.luehr.rustytherobot")
-                .serve_at("/", robot)
+                .serve_at("/", dbus_robot)
+                .serve_at("/", dbus_world)
                 .build()
                 .await?;
             info!("world state: {world}");
-            let object_server: InterfaceRef<Robot> =
+            let object_server: InterfaceRef<DbusRobot> =
                 connection.object_server().interface("/").await?;
             smol::spawn(async move {
-                while let Ok(crate::dbus::Message {
-                    robot_name,
-                    command,
-                    return_channel,
-                }) = command_channel_rx.recv().await
-                {
-                    match command {
-                        RobotCommand::Info(_) => {
-                            let Some(robot) = world.robot(&robot_name) else {
-                                break;
-                            };
-                            let Some(return_channel) = return_channel else {
-                                break;
-                            };
-                            return_channel.send(Snapshot::from(robot)).await.ok();
-                            info!("Robot position: {robot}");
-                        }
-                        _ => match handle_robot(robot_name, &mut world, command) {
-                            Ok(snapshots) => {
-                                for (e, s) in snapshots {
-                                    object_server
-                                        .signal_emitter()
-                                        .robot_state(
-                                            &e.to_string(),
-                                            &s.name,
-                                            s.position.x,
-                                            s.position.y,
-                                            s.battery_level,
-                                            s.health,
-                                            s.team_id,
-                                        )
-                                        .await
-                                        .inspect_err(|err| error!("could not send signal: {err}"))
-                                        .ok();
-                                }
+                loop {
+                    let message = future::or(
+                        async {
+                            robot_command_channel_rx
+                                .recv()
+                                .await
+                                .map(DbusMessage::Robot)
+                        },
+                        async {
+                            world_command_channel_rx
+                                .recv()
+                                .await
+                                .map(DbusMessage::World)
+                        },
+                    )
+                    .await;
+                    match message {
+                        Ok(DbusMessage::Robot(crate::dbus::RobotMessage {
+                            robot_name,
+                            command,
+                            return_channel,
+                        })) => match command {
+                            RobotCommand::Info(_) => {
+                                let Some(robot) = world.robot(&robot_name) else {
+                                    break;
+                                };
+                                let Some(return_channel) = return_channel else {
+                                    break;
+                                };
+                                return_channel.send(Snapshot::from(robot)).await.ok();
+                                info!("Robot position: {robot}");
                             }
-                            Err(err) => {
-                                warn!("handle_robot failed: {err}");
+                            _ => match handle_robot(robot_name, &mut world, command) {
+                                Ok(snapshots) => {
+                                    for (e, s) in snapshots {
+                                        object_server
+                                            .signal_emitter()
+                                            .robot_state(
+                                                &e.to_string(),
+                                                &s.name,
+                                                s.position.x,
+                                                s.position.y,
+                                                s.battery_level,
+                                                s.health,
+                                                s.team_id,
+                                            )
+                                            .await
+                                            .inspect_err(|err| {
+                                                error!("could not send signal: {err}")
+                                            })
+                                            .ok();
+                                    }
+                                }
+                                Err(err) => {
+                                    warn!("handle_robot failed: {err}");
+                                }
+                            },
+                        },
+                        Ok(DbusMessage::World(crate::dbus::WorldMessage {
+                            command,
+                            return_channel,
+                        })) => match command {
+                            WorldCommand::ListRobots(_) => {
+                                let Some(return_channel) = return_channel else {
+                                    break;
+                                };
+                                return_channel
+                                    .send(WorldReturn::RobotList(world.robots()))
+                                    .await
+                                    .ok();
+                            }
+                            WorldCommand::BoardDimensions(_) => {
+                                let Some(return_channel) = return_channel else {
+                                    break;
+                                };
+                                return_channel
+                                    .send(WorldReturn::BoardDimensions(config.world_size.clone()))
+                                    .await
+                                    .ok();
+                            }
+                            WorldCommand::ListChargepads(_) => {
+                                let Some(return_channel) = return_channel else {
+                                    break;
+                                };
+
+                                return_channel
+                                    .send(WorldReturn::ChargepadList(world.chargepads()))
+                                    .await
+                                    .ok();
                             }
                         },
+                        Err(err) => {
+                            warn!("channel closed: {err}");
+                            break;
+                        }
                     }
                 }
             })
@@ -159,12 +238,15 @@ fn handle_robot(
                     .into(),
             )]
         }
-        RobotCommand::Move(MoveCommand { direction }) => vec![(
-            Event::Changed,
-            world
-                .execute_move(&robot_name, direction.into())
-                .inspect_err(|err| error!("{err}"))?,
-        )],
+        RobotCommand::Move(MoveCommand { direction }) => {
+            info!("move to {direction:?}");
+            vec![(
+                Event::Changed,
+                world
+                    .execute_move(&robot_name, direction.into())
+                    .inspect_err(|err| error!("{err}"))?,
+            )]
+        }
         RobotCommand::Attack(AttackCommand { power }) => world
             .execute_attack(&robot_name, power)
             .inspect_err(|err| error!("{err}"))?
