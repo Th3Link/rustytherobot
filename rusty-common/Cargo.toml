@@ -1,0 +1,8 @@
+[package]
+name = "rusty-common"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde           = { version = "1", features = ["derive"] }
+zbus            = { version = "6", default-features = false }

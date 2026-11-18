@@ -1,9 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::cli::*;
-use crate::dimension::Dimension;
-use crate::position::Position;
 use crate::robot::Snapshot;
+use rusty_common::dimension::Dimension;
+use rusty_common::position::Position;
 use zbus::object_server::SignalEmitter;
 
 pub enum Message {

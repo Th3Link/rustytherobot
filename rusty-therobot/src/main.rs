@@ -1,5 +1,5 @@
-use rustytherobot::cli::Cli;
-use rustytherobot::run::run;
+use rusty_therobot::cli::Cli;
+use rusty_therobot::run::run;
 use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 

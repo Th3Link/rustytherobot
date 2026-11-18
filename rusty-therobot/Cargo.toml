@@ -1,0 +1,20 @@
+[package]
+name = "rusty-therobot"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rusty-common = { path = "../rusty-common" }
+argh                = { version = "0.1" }
+directories         = { version = "6" }
+serde               = { version = "1" }
+serde_json          = { version = "1" }
+ron                 = { version = "0.12" }
+anyhow              = { version = "1" }
+rand                = { version =  "0.10" }
+thiserror           = { version = "2" }
+zbus                = { version = "6" }
+smol                = { version = "2" }
+strum               = { version = "0.28", features = ["derive"] }
+tracing.workspace   = true
+tracing-subscriber.workspace   = true

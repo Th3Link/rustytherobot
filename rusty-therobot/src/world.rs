@@ -1,12 +1,12 @@
 use crate::config::Config;
 use crate::direction::Direction;
-use crate::position::Position;
 use crate::robot::{MAX_BATTERY_LEVEL, Movable, Robot, Snapshot};
 use anyhow::{Context, Result, anyhow, bail};
 use directories::ProjectDirs;
 use rand::rng;
 use rand::seq::SliceRandom;
 use ron::ser::to_string_pretty;
+use rusty_common::position::Position;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tile::Tile;

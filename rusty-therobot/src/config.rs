@@ -1,6 +1,6 @@
-use crate::dimension::Dimension;
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
+use rusty_common::dimension::Dimension;
 use serde::{Deserialize, Serialize};
 
 const CONFIG_FILENAME: &str = "config.ron";

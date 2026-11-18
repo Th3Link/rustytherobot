@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use zbus::zvariant::Type;
+use zbus::Type;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Type)]
 pub struct Position {
