@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use zbus::zvariant::Type;
+use zbus::Type;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Dimension {

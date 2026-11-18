@@ -1,9 +1,9 @@
-use rustytherobot::cli::Cli;
-use rustytherobot::run::run;
-use tracing::{Level, info};
+use rusty_http::run;
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.´
@@ -14,10 +14,5 @@ fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let cli: Cli = argh::from_env();
-    info!("main started");
-    smol::block_on(async {
-        let _ = run(cli).await;
-    });
-    info!("end main");
+    run::run().await
 }

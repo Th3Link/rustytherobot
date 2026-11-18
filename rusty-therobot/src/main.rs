@@ -1,0 +1,23 @@
+use rusty_therobot::cli::Cli;
+use rusty_therobot::run::run;
+use tracing::{Level, info};
+use tracing_subscriber::FmtSubscriber;
+
+fn main() {
+    let subscriber = FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.´
+        .with_env_filter("info")
+        .with_max_level(Level::INFO)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    let cli: Cli = argh::from_env();
+    info!("main started");
+    smol::block_on(async {
+        let _ = run(cli).await;
+    });
+    info!("end main");
+}

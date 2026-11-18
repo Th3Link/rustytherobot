@@ -1,0 +1,19 @@
+[package]
+name = "rusty-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rusty-common = { path = "../rusty-common" }
+zbus                = { version = "6", default-features = false, features = ["tokio", "proxy"] }
+tokio               = { version = "1", features = ["full"] }
+anyhow              = { version = "1" }
+futures-lite        = { version = "2" }
+axum                = { version = "0.8" }
+serde               = { version = "1" }
+serde_json          = { version = "1" }
+tokio-stream        = { version = "0.1", features = ["sync"] }
+rust-embed          = { version = "8" }
+mime_guess          = { version = "2" }
+tracing.workspace   = true
+tracing-subscriber.workspace   = true

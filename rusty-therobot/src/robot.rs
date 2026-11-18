@@ -1,6 +1,6 @@
 use crate::direction::Direction;
-use crate::position::Position;
 use anyhow::{Result, bail};
+use rusty_common::position::Position;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
